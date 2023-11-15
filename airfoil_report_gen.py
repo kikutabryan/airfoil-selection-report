@@ -5,7 +5,6 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 
 def extract_airfoil_name(file_path):
-    # Read the first few lines of the file to extract the airfoil name
     with open(file_path, "r") as file:
         for i in range(5):
             line = file.readline()
@@ -112,7 +111,31 @@ def plot_airfoil_data(file_path, pdf):
 
 
 def process_directory_to_pdf(directory_path, pdf_path):
-    # Create a PDF document
+    # Collect file paths, airfoil names, and corresponding max CL values
+    airfoils_info = []
+    for filename in os.listdir(directory_path):
+        if filename.endswith(".txt"):
+            file_path = os.path.join(directory_path, filename)
+            airfoil_name = extract_airfoil_name(file_path)
+            column_names = [
+                "alpha",
+                "CL",
+                "CD",
+                "CDp",
+                "CM",
+                "Top_Xtr",
+                "Bot_Xtr",
+            ]
+            data = pd.read_csv(
+                file_path, sep="\s+", skiprows=13, names=column_names
+            )
+            max_cl_cd_index = (data["CL"] / data["CD"]).idxmax()
+            max_cl = data["CL"][max_cl_cd_index]
+            airfoils_info.append((file_path, airfoil_name, max_cl))
+
+    # Sort airfoils by increasing CL value
+    airfoils_info.sort(key=lambda x: x[2])
+
     with PdfPages(pdf_path) as pdf:
         # Create a title page
         title_page = plt.figure(figsize=(8, 11))
@@ -129,32 +152,32 @@ def process_directory_to_pdf(directory_path, pdf_path):
         pdf.savefig(title_page)
         plt.close()
 
-        # Collect file paths and corresponding max CL values
-        file_info = []
-        for filename in os.listdir(directory_path):
-            if filename.endswith(".txt"):
-                file_path = os.path.join(directory_path, filename)
-                column_names = [
-                    "alpha",
-                    "CL",
-                    "CD",
-                    "CDp",
-                    "CM",
-                    "Top_Xtr",
-                    "Bot_Xtr",
-                ]
-                data = pd.read_csv(
-                    file_path, sep="\s+", skiprows=13, names=column_names
-                )
-                max_cl_cd_index = (data["CL"] / data["CD"]).idxmax()
-                max_cl = data["CL"][max_cl_cd_index]
-                file_info.append((file_path, max_cl))
-
-        # Sort files by increasing CL value
-        file_info.sort(key=lambda x: x[1])
+        # Create a table of contents page
+        toc_page = plt.figure(figsize=(8, 11))
+        toc_page.clf()
+        toc_page.text(
+            0.5,
+            0.9,
+            "Table of Contents",
+            ha="center",
+            va="center",
+            fontsize=16,
+            fontweight="bold",
+        )
+        for i, (_, airfoil_name, _) in enumerate(airfoils_info, start=1):
+            toc_page.text(
+                0.1,
+                0.8 - 0.05 * i,
+                f"{i}. {airfoil_name}",
+                ha="left",
+                va="top",
+                fontsize=12,
+            )
+        pdf.savefig(toc_page)
+        plt.close()
 
         # Process each file and add plots to the PDF
-        for file_path, _ in file_info:
+        for file_path, _, _ in airfoils_info:
             plot_airfoil_data(file_path, pdf)
 
 
