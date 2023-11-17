@@ -13,8 +13,21 @@ def extract_airfoil_name(file_path):
     return "Unknown Airfoil"
 
 
-def plot_airfoil_data(file_path, pdf):
+def extract_reynolds_number(file_path):
+    with open(file_path, "r") as file:
+        for line in file:
+            if "Re =" in line:
+                parts = line.split("Re =")[1].split()
+                re_number = (
+                    parts[0] + "E" + parts[2]
+                )  # Combine the number and exponent parts
+                return float(re_number)
+    return "Unknown Reynolds Number"
+
+
+def plot_airfoil_data(file_path, pdf, page_number):
     airfoil_name = extract_airfoil_name(file_path)
+    reynolds_number = extract_reynolds_number(file_path)
 
     # Read the data from the file
     column_names = ["alpha", "CL", "CD", "CDp", "CM", "Top_Xtr", "Bot_Xtr"]
@@ -29,7 +42,11 @@ def plot_airfoil_data(file_path, pdf):
 
     # Create plots
     fig, axes = plt.subplots(3, 1, figsize=(8, 11))
-    plt.suptitle(airfoil_name, fontsize=16, fontweight="bold")
+    plt.suptitle(
+        f"{airfoil_name}, Re = {reynolds_number:.3e}",
+        fontsize=16,
+        fontweight="bold",
+    )
 
     # Plot CL vs alpha
     axes[0].plot(data["alpha"], data["CL"], label="CL", color="blue")
@@ -105,6 +122,15 @@ def plot_airfoil_data(file_path, pdf):
         bbox={"facecolor": "orange", "alpha": 0.5, "pad": 5},
     )
 
+    # Add page number at the bottom right of the page
+    plt.figtext(
+        0.95,
+        0.02,
+        f"Page {page_number}",
+        ha="right",
+        fontsize=10,
+    )
+
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
     pdf.savefig(fig)  # Save the current figure to PDF
     plt.close()
@@ -164,12 +190,20 @@ def process_directory_to_pdf(directory_path, pdf_path):
             fontsize=16,
             fontweight="bold",
         )
-        for i, (_, airfoil_name, _) in enumerate(airfoils_info, start=1):
+        for i, (_, airfoil_name, max_cl) in enumerate(airfoils_info, start=1):
             toc_page.text(
                 0.1,
                 0.8 - 0.05 * i,
-                f"{i}. {airfoil_name}",
+                f"{i}. {airfoil_name}, CL at Max CL/CD: {max_cl:.4f}",
                 ha="left",
+                va="top",
+                fontsize=12,
+            )
+            toc_page.text(
+                0.9,
+                0.8 - 0.05 * i,
+                f"Page {i}",
+                ha="right",
                 va="top",
                 fontsize=12,
             )
@@ -177,8 +211,10 @@ def process_directory_to_pdf(directory_path, pdf_path):
         plt.close()
 
         # Process each file and add plots to the PDF
-        for file_path, _, _ in airfoils_info:
-            plot_airfoil_data(file_path, pdf)
+        for i, (file_path, _, _) in enumerate(airfoils_info):
+            plot_airfoil_data(
+                file_path, pdf, i + 1
+            )  # Start page numbering from 3 because of title and TOC pages
 
 
 # Replace with the path to your directory and desired PDF output path
